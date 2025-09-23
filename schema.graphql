@@ -1,0 +1,105 @@
+# pawUSDC Points System Schema
+# Tracks user balances, tiers, and hourly point distribution
+
+# Main user entity - tracks current state
+type User @entity {
+  id: ID!                           # user_address
+  current_balance_wei: BigInt!      # Raw wei amount from blockchain
+  current_balance: String!          # Human-readable amount (e.g., "150.5")
+  current_tier: Int!                # 0, 1, 2, 3, or 4
+  total_points_earned: BigInt!      # All-time points accumulated
+  last_update_timestamp: BigInt!    # When balance was last updated
+  
+  # Relations
+  weeklyPoints: [UserWeeklyPoints!]! @derivedFrom(field: "user")
+  snapshots: [HourlySnapshot!]! @derivedFrom(field: "user")
+}
+
+# Weekly points tracking for caps and leaderboards
+type UserWeeklyPoints @entity {
+  id: ID!                           # user_address + week_number (e.g., "0x123_2025-09-28")
+  user: User!                       # Reference to user
+  user_address: String!             # User's wallet address
+  week_number: String!              # Week start date (e.g., "2025-09-28")
+  points_earned_this_week: BigInt!  # Total points earned this week
+  weekly_cap: BigInt!               # Weekly cap based on tier (120, 280, 450, 600)
+  is_cap_reached: Boolean!          # True if user hit their weekly cap
+}
+
+# Hourly snapshot records - one per user per hour
+type HourlySnapshot @entity {
+  id: ID!                           # user_address + snapshot_hour (e.g., "0x123_2025-09-23-10")
+  user: User!                       # Reference to user
+  user_address: String!             # User's wallet address
+  points_awarded: BigInt!           # Points awarded for this hour (1, 2, 3, or 4)
+  tier_at_time: Int!                # User's tier at this snapshot (1, 2, 3, or 4)
+  balance_at_time_wei: BigInt!      # User's balance in wei at snapshot time
+  balance_at_time: String!          # Human-readable balance at snapshot time
+  snapshot_hour: String!            # Hour identifier (e.g., "2025-09-23-10")
+  week_number: String!              # Week this snapshot belongs to (e.g., "2025-09-28")
+  timestamp: BigInt!                # Block timestamp of the snapshot
+}
+
+# Global system statistics (optional but recommended)
+type GlobalStats @entity {
+  id: ID!                           # Singleton record: "global"
+  total_users: BigInt!              # Total number of users with pawUSDC
+  total_points_distributed: BigInt! # All-time points awarded
+  current_week_number: String!      # Current active week (e.g., "2025-09-28")
+  last_snapshot_hour: String!       # Last completed snapshot hour (e.g., "2025-09-23-15")
+  tier_distribution: String!        # JSON string with tier counts {"tier1": 100, "tier2": 50...}
+}
+
+# ERC20 Transfer events tracking (for balance updates)
+type Transfer @entity {
+  id: ID!                           # chainId_blockNumber_logIndex
+  from: String!                     # Token sender (0x0 for mints)
+  to: String!                       # Token receiver (0x0 for burns)
+  amount_wei: BigInt!               # Transfer amount in wei
+  amount: String!                   # Transfer amount in human-readable format
+  timestamp: BigInt!                # Block timestamp
+  block_number: BigInt!             # Block number
+  transaction_hash: String!         # Transaction hash
+}
+
+# ERC20 Approval events tracking (optional - for completeness)
+type Approval @entity {
+  id: ID!                           # chainId_blockNumber_logIndex  
+  owner: String!                    # Token owner
+  spender: String!                  # Approved spender
+  amount_wei: BigInt!               # Approved amount in wei
+  amount: String!                   # Approved amount in human-readable format
+  timestamp: BigInt!                # Block timestamp
+  block_number: BigInt!             # Block number
+  transaction_hash: String!         # Transaction hash
+}
+
+# pawUSDC Deposit events (USDC → pawUSDC minting)
+type Deposit @entity {
+  id: ID!                           # chainId_blockNumber_logIndex
+  user: String!                     # User who deposited (dst in event)
+  usdc_amount_wei: BigInt!          # USDC deposited in wei
+  usdc_amount: String!              # USDC deposited (human-readable)
+  pawusdc_minted_wei: BigInt!       # pawUSDC tokens minted in wei
+  pawusdc_minted: String!           # pawUSDC tokens minted (human-readable)
+  exchange_rate: String!            # Exchange rate at time of deposit
+  timestamp: BigInt!                # Block timestamp
+  block_number: BigInt!             # Block number
+  transaction_hash: String!         # Transaction hash
+}
+
+# pawUSDC Withdrawal events (pawUSDC → USDC redemption)
+type Withdrawal @entity {
+  id: ID!                           # chainId_blockNumber_logIndex
+  user: String!                     # User who withdrew (src in event)
+  pawusdc_burned_wei: BigInt!       # pawUSDC tokens burned in wei
+  pawusdc_burned: String!           # pawUSDC tokens burned (human-readable)
+  usdc_received_wei: BigInt!        # USDC received in wei (after fees)
+  usdc_received: String!            # USDC received (human-readable)
+  exchange_rate: String!            # Exchange rate at time of withdrawal
+  redemption_fee_wei: BigInt!       # Fee paid in wei (0.25%)
+  redemption_fee: String!           # Fee paid (human-readable)
+  timestamp: BigInt!                # Block timestamp
+  block_number: BigInt!             # Block number
+  transaction_hash: String!         # Transaction hash
+}
