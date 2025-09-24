@@ -6,7 +6,7 @@ networks:
   contracts:
   - name: WMON
     address:
-    - 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701
+    - 0xC56B5dfc1A6E73246a053f6eeb9Ebae33A82a1EA
     handler: src/EventHandlers.ts
     events:
     - event: Approval(address indexed src, address indexed guy, uint256 wad)

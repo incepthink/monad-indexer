@@ -195,19 +195,43 @@ async function getOrCreateUser(address: string, context: handlerContext): Promis
   return { user, isNewUser };
 }
 
+async function incrementTierCount(tier: number, context: handlerContext): Promise<void> {
+  const globalStats = await getOrCreateGlobalStats(context);
+  const tierDist = JSON.parse(globalStats.tier_distribution);
+
+  // Increment the tier count
+  if (tier > 0) {
+    tierDist[`tier${tier}`] = (tierDist[`tier${tier}`] || 0) + 1;
+  } else {
+    tierDist.tier0 = (tierDist.tier0 || 0) + 1;
+  }
+
+  const updatedGlobalStats: GlobalStats = {
+    ...globalStats,
+    tier_distribution: JSON.stringify(tierDist)
+  };
+
+  context.GlobalStats.set(updatedGlobalStats);
+}
+
 // Update user balance and tier
 async function updateUserBalance(
   user: User,
   newBalanceWei: bigint,
   timestamp: number,
-  context: handlerContext
+  context: handlerContext,
+  isNewUser: boolean = false // Add this parameter
 ): Promise<User> {
   const tokenAmount = weiToTokenAmount(newBalanceWei);
   const newTier = calculateTier(tokenAmount);
   const oldTier = user.current_tier;
 
-  // Update tier distribution if tier changed
-  if (oldTier !== newTier) {
+  // Update tier distribution - only if tier actually changed OR it's a new user
+  if (isNewUser) {
+    // For new users, just increment the new tier (don't decrement anything)
+    await incrementTierCount(newTier, context);
+  } else if (oldTier !== newTier) {
+    // For existing users, only update if tier changed
     await updateTierDistribution(oldTier, newTier, context);
   }
 
@@ -367,7 +391,7 @@ WMON.Transfer.handler(async ({ event, context }: { event: WMON_Transfer_event; c
     const currentBalance = sender.current_balance_wei;
     const newBalance = currentBalance - wad;
 
-    const updatedSender = await updateUserBalance(sender, newBalance, timestamp, context);
+    const updatedSender = await updateUserBalance(sender, newBalance, timestamp, context, false);
     context.User.set(updatedSender);
 
     // Process hourly points for sender
@@ -380,7 +404,7 @@ WMON.Transfer.handler(async ({ event, context }: { event: WMON_Transfer_event; c
     const currentBalance = receiver.current_balance_wei;
     const newBalance = currentBalance + wad;
 
-    const updatedReceiver = await updateUserBalance(receiver, newBalance, timestamp, context);
+    const updatedReceiver = await updateUserBalance(receiver, newBalance, timestamp, context, isNewUser);
     context.User.set(updatedReceiver);
 
     // If new user, increment total users count
@@ -424,7 +448,7 @@ WMON.Deposit.handler(async ({ event, context }: { event: WMON_Deposit_event; con
   // Update user balance and process points
   const { user, isNewUser } = await getOrCreateUser(dst, context);
   const newBalance = user.current_balance_wei + wad;
-  const updatedUser = await updateUserBalance(user, newBalance, timestamp, context);
+  const updatedUser = await updateUserBalance(user, newBalance, timestamp, context, isNewUser);
   context.User.set(updatedUser);
 
   // If new user, increment total users count
@@ -469,7 +493,7 @@ WMON.Withdrawal.handler(async ({ event, context }: { event: WMON_Withdrawal_even
   // Update user balance and process points
   const { user } = await getOrCreateUser(src, context);
   const newBalance = user.current_balance_wei - wad;
-  const updatedUser = await updateUserBalance(user, newBalance, timestamp, context);
+  const updatedUser = await updateUserBalance(user, newBalance, timestamp, context, false);
   context.User.set(updatedUser);
 
   // Process hourly points
