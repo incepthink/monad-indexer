@@ -1,17 +1,17 @@
 # yaml-language-server: $schema=./node_modules/envio/evm.schema.json
 name: monad-indexer
 networks:
-- id: 10143
-  start_block: 0
-  contracts:
-  - name: WMON
-    address:
-    - 0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701
-    handler: src/EventHandlers.ts
-    events:
-    - event: Approval(address indexed src, address indexed guy, uint256 wad)
-    - event: Deposit(address indexed dst, uint256 wad)
-    - event: Transfer(address indexed src, address indexed dst, uint256 wad)
-    - event: Withdrawal(address indexed src, uint256 wad)
+  - id: 10143
+    start_block: 0
+    contracts:
+      - name: WMON
+        address:
+          - 0x4c393D9Dfc3b18477859BA74e610Eb40d04D7777
+        handler: src/EventHandlers.ts
+        events:
+          - event: Approval(address indexed src, address indexed guy, uint256 wad)
+          - event: Deposit(address indexed dst, uint256 wad)
+          - event: Transfer(address indexed src, address indexed dst, uint256 wad)
+          - event: Withdrawal(address indexed src, uint256 wad)
 unordered_multichain_mode: true
 preload_handlers: true
